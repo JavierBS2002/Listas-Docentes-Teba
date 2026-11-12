@@ -3,7 +3,7 @@
 //   se vean de inmediato; si no hay conexión, se usa la copia guardada.
 // - Íconos y demás archivos: se muestra lo guardado y se actualiza por detrás.
 // Los datos de asistencia NO pasan por aquí: van directo al servidor.
-const CACHE = 'asistencia-teba-clasica-v4';
+const CACHE = 'asistencia-teba-clasica-v5';
 const ARCHIVOS = ['./', './index.html', './direccion.js', './config.js', './manifest.webmanifest', './icono-192.png', './icono-512.png', './icono-apple.png'];
 
 self.addEventListener('install', (e) => {
@@ -32,7 +32,12 @@ self.addEventListener('fetch', (e) => {
     });
     deRed.catch(() => {});
     if (primeroRed) {
-      return deRed.catch(() => c.match(llave, { ignoreSearch: esPagina }));
+      // Con señal débil no se espera de más: si en 2.5 s no responde internet, se abre la copia guardada
+      // (y la versión nueva se guarda por detrás para la próxima vez).
+      const guardado = c.match(llave, { ignoreSearch: esPagina });
+      const espera = new Promise((ok) => setTimeout(ok, esPagina ? 2500 : 1200)).then(() => guardado);
+      return Promise.race([deRed, espera.then((g) => g || deRed)]).then((r) => r || guardado.then((g) => g || deRed))
+        .catch(() => guardado.then((g) => g || Response.error()));
     }
     return c.match(llave).then((guardado) => guardado || deRed).catch(() => deRed);
   }));
